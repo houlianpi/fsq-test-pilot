@@ -41,23 +41,41 @@ def test_new_tab():
     print("Test: Create New Tab in Microsoft Edge")
     print("=" * 50)
     
-    # Step 1: Check environment
+    # Step 1: Check environment (relaxed - only check critical items)
     print("\n[1/5] Checking environment...")
     doctor = run_mac("doctor", check=False)
-    if not doctor or not doctor.get("ok"):
-        print("  ⚠️  Environment check failed. Make sure Appium is running.")
-        print("  Run: appium")
-        return False
-    print("  ✅ Environment OK")
+    if doctor:
+        checks = doctor.get("error", {}).get("details", {}).get("checks", [])
+        if not checks:
+            checks = doctor.get("data", {}).get("checks", [])
+        
+        # Check critical items: accessibility and appium
+        critical_pass = True
+        for check in checks:
+            name = check.get("name")
+            status = check.get("status")
+            if name in ["accessibility_permission", "appium_server"]:
+                if status != "pass":
+                    print(f"  ❌ Critical check failed: {name}")
+                    critical_pass = False
+                else:
+                    print(f"  ✅ {name}: pass")
+        
+        if not critical_pass:
+            print("  ⚠️  Critical environment checks failed.")
+            return False
+        print("  ✅ Critical checks passed")
+    else:
+        print("  ⚠️  Could not run doctor, attempting to continue...")
     
     # Step 2: Start session (if not already started)
     print("\n[2/5] Starting session...")
     session = run_mac("session", "start", check=False)
     if session and session.get("ok"):
-        print(f"  ✅ Session started: {session.get('session_id', 'unknown')}")
+        print(f"  ✅ Session started: {session.get('data', {}).get('session_id', 'unknown')}")
     else:
         # Try to use existing session
-        print("  ℹ️  Using existing session")
+        print("  ℹ️  Using existing session or starting new one")
     
     # Step 3: Launch/activate Edge
     print("\n[3/5] Launching Microsoft Edge...")
@@ -75,7 +93,7 @@ def test_new_tab():
     
     time.sleep(1)  # Wait for app to be ready
     
-    # Step 4: Get initial tab count (by counting windows or tabs)
+    # Step 4: Create new tab
     print("\n[4/5] Creating new tab...")
     
     # Use hotkey Cmd+T to create new tab
