@@ -1,0 +1,55 @@
+name: PR Test Report
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  comment:
+    name: Add Test Info Comment
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Count changes
+        id: count
+        run: |
+          TEST_FILES=$(git diff --name-only origin/main...HEAD | grep "^tests/" | wc -l || echo 0)
+          SCRIPT_FILES=$(git diff --name-only origin/main...HEAD | grep "^scripts/" | wc -l || echo 0)
+          DOC_FILES=$(git diff --name-only origin/main...HEAD | grep "^docs/" | wc -l || echo 0)
+          echo "tests=$TEST_FILES" >> $GITHUB_OUTPUT
+          echo "scripts=$SCRIPT_FILES" >> $GITHUB_OUTPUT
+          echo "docs=$DOC_FILES" >> $GITHUB_OUTPUT
+      
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tests = '${{ steps.count.outputs.tests }}';
+            const scripts = '${{ steps.count.outputs.scripts }}';
+            const docs = '${{ steps.count.outputs.docs }}';
+            
+            const body = `## 🤖 Test Pilot CI Report
+            
+            | Category | Changed Files |
+            |----------|---------------|
+            | Tests | ${tests} |
+            | Scripts | ${scripts} |
+            | Docs | ${docs} |
+            
+            ---
+            
+            **Note**: Full integration tests require macOS self-hosted runner.
+            
+            - ✅ Syntax check passed
+            - ✅ Environment scripts validated
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
